@@ -5,27 +5,33 @@ from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Tuple
 
 import holidays
-from dateutil import parser
 from fastmcp import FastMCP
 
 mcp = FastMCP("india-working-days")
 
+SUPPORTED_INPUT_FORMATS: Tuple[str, ...] = ("%Y-%m", "%m/%Y", "%B %Y", "%b %Y")
+
 
 def parse_month_input(month_input: str) -> Tuple[int, int, str]:
-    """Parse values like 'November 2026', '2026-11', or '11/2026'."""
+    """Parse strict month inputs like 'November 2026', '2026-11', or '11/2026'."""
     text = month_input.strip()
+    if not text:
+        raise ValueError(
+            "month_input is required. Supported formats: YYYY-MM, MM/YYYY, Month YYYY, Mon YYYY."
+        )
 
-    for fmt in ("%Y-%m", "%m/%Y", "%B %Y", "%b %Y"):
+    for fmt in SUPPORTED_INPUT_FORMATS:
         try:
             dt = datetime.strptime(text, fmt)
             label = dt.strftime("%B %Y")
             return dt.year, dt.month, label
         except ValueError:
-            pass
+            continue
 
-    dt = parser.parse(text, default=datetime(2000, 1, 1))
-    label = dt.strftime("%B %Y")
-    return dt.year, dt.month, label
+    raise ValueError(
+        "Invalid month_input. Supported formats: YYYY-MM, MM/YYYY, Month YYYY, Mon YYYY. "
+        "Examples: '2026-11', '11/2026', 'November 2026', 'Nov 2026'."
+    )
 
 
 def get_month_dates(year: int, month: int) -> List[date]:
@@ -115,8 +121,19 @@ def get_india_working_days(month_input: str) -> Dict[str, Any]:
     Return the total working days in a given month for India,
     excluding Saturdays, Sundays, and India public holidays.
 
+    Supported input formats:
+    - YYYY-MM
+    - MM/YYYY
+    - Month YYYY
+    - Mon YYYY
+
+    Notes:
+    - Holiday coverage depends on the `holidays` package data for India and the requested year.
+    - Some movable/festival holidays such as Eid or Diwali are only available if present in the
+      underlying holiday dataset for that year.
+
     Args:
-        month_input: Examples: 'November 2026', '2026-11', '11/2026'
+        month_input: Examples: 'November 2026', '2026-11', '11/2026', 'Nov 2026'
     """
     year, month, _ = parse_month_input(month_input)
     return calculate_working_days(year, month)
